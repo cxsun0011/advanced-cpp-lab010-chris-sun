@@ -38,30 +38,101 @@ std::size_t HashTable::probe(const std::string& key) const {
 }
 
 bool HashTable::insert(const std::string& key, int value) {
-    (void)key;
-    (void)value;
-    throw std::logic_error("Student implementation required: insert");
+    if (static_cast<double>(size_ + 1) / table_.size() > 0.5) {
+        rehash();
+    }
+
+    std::size_t index = hashFunction(key);
+    std::size_t original = index;
+    std::size_t step = 1;
+    long long firstDeleted = -1;
+
+    while (table_[index].occupied || table_[index].deleted) {
+        if (table_[index].occupied && !table_[index].deleted && table_[index].key == key) {
+            return false;
+        }
+        if (table_[index].deleted && firstDeleted == -1) {
+            firstDeleted = static_cast<long long>(index);
+        }
+        index = (original + step * step) % table_.size();
+        ++step;
+        if (step > table_.size()) break;
+    }
+
+    std::size_t targetIndex = (firstDeleted != -1) ? static_cast<std::size_t>(firstDeleted) : index;
+
+    table_[targetIndex] = HashEntry(key, value, true, false);
+    ++size_;
+    return true;
 }
 
 bool HashTable::remove(const std::string& key) {
-    (void)key;
-    throw std::logic_error("Student implementation required: remove");
+    std::size_t index = hashFunction(key);
+    std::size_t original = index;
+    std::size_t step = 1;
+
+    while (table_[index].occupied || table_[index].deleted) {
+        if (table_[index].occupied && !table_[index].deleted && table_[index].key == key) {
+            table_[index].occupied = false;
+            table_[index].deleted = true;
+            table_[index].key = "";
+            --size_;
+            return true;
+        }
+        index = (original + step * step) % table_.size();
+        ++step;
+        if (step > table_.size()) break;
+    }
+    return false;
 }
 
 bool HashTable::contains(const std::string& key) const {
-    (void)key;
-    throw std::logic_error("Student implementation required: contains");
+    std::size_t index = hashFunction(key);
+    std::size_t original = index;
+    std::size_t step = 1;
+
+    while (table_[index].occupied || table_[index].deleted) {
+        if (table_[index].occupied && !table_[index].deleted && table_[index].key == key) {
+            return true;
+        }
+        index = (original + step * step) % table_.size();
+        ++step;
+        if (step > table_.size()) break;
+    }
+    return false;
 }
 
 int HashTable::get(const std::string& key) const {
-    (void)key;
-    throw std::logic_error("Student implementation required: get");
+    std::size_t index = hashFunction(key);
+    std::size_t original = index;
+    std::size_t step = 1;
+
+    while (table_[index].occupied || table_[index].deleted) {
+        if (table_[index].occupied && !table_[index].deleted && table_[index].key == key) {
+            return table_[index].value;
+        }
+        index = (original + step * step) % table_.size();
+        ++step;
+        if (step > table_.size()) break;
+    }
+    throw std::out_of_range("Key not found in hash table");
 }
 
 bool HashTable::update(const std::string& key, int newValue) {
-    (void)key;
-    (void)newValue;
-    throw std::logic_error("Student implementation required: update");
+    std::size_t index = hashFunction(key);
+    std::size_t original = index;
+    std::size_t step = 1;
+
+    while (table_[index].occupied || table_[index].deleted) {
+        if (table_[index].occupied && !table_[index].deleted && table_[index].key == key) {
+            table_[index].value = newValue;
+            return true;
+        }
+        index = (original + step * step) % table_.size();
+        ++step;
+        if (step > table_.size()) break;
+    }
+    return false;
 }
 
 std::size_t HashTable::size() const noexcept {
@@ -101,7 +172,17 @@ std::vector<int> HashTable::values() const {
 }
 
 void HashTable::rehash() {
-    throw std::logic_error("Student implementation required: rehash");
+    std::size_t newCapacity = nextPrime(table_.size() * 2);
+    std::vector<HashEntry> oldTable = std::move(table_);
+
+    table_ = std::vector<HashEntry>(newCapacity, HashEntry());
+    size_ = 0;
+
+    for (const auto& entry : oldTable) {
+        if (entry.occupied && !entry.deleted) {
+            insert(entry.key, entry.value);
+        }
+    }
 }
 
 bool HashTable::isPrime(std::size_t value) const {
